@@ -1,11 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 
-// Safari-compatible worker loading: new URL() pattern works reliably across all browsers
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+// Safari production fix: serve worker as static .js file from public/ folder
+// to avoid MIME type issues with .mjs on shared hosting
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.js`
 
 export interface TextItem {
   text: string
