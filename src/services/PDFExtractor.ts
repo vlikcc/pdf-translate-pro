@@ -1,8 +1,11 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?worker'
 
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker()
+// Safari-compatible worker loading: new URL() pattern works reliably across all browsers
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString()
 
 export interface TextItem {
   text: string
@@ -18,13 +21,33 @@ class PDFExtractor {
 
   async loadDocument(arrayBuffer: ArrayBuffer): Promise<{ totalPages: number; isScanned: boolean }> {
     this.destroy()
-    const data = new Uint8Array(arrayBuffer)
-    this.document = await pdfjsLib.getDocument({ data }).promise
+    // pdf.js worker'a buffer transfer eder ve detach eder; kopya kullan (Safari + state'teki orijinal buffer)
+    const data = new Uint8Array(arrayBuffer.slice(0))
+
+    try {
+      this.document = await pdfjsLib.getDocument({
+        data,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true,
+      }).promise
+    } catch (err) {
+      console.error('PDF.js loadDocument error:', err)
+      throw err
+    }
+
     const totalPages = this.document.numPages
 
-    const firstPage = await this.getPage(1)
-    const textContent = await firstPage.getTextContent()
-    const isScanned = textContent.items.length === 0
+    // Text content extraction can fail on some browsers/PDFs - don't let it block loading
+    let isScanned = false
+    try {
+      const firstPage = await this.getPage(1)
+      const textContent = await firstPage.getTextContent()
+      isScanned = textContent.items.length === 0
+    } catch (err) {
+      console.warn('Text content extraction failed, treating as scanned PDF:', err)
+      isScanned = true
+    }
 
     return { totalPages, isScanned }
   }

@@ -11,7 +11,10 @@ export function usePDF() {
 
   const loadFile = useCallback(
     async (file: File) => {
-      if (file.type !== 'application/pdf') {
+      const looksPdf =
+        file.type === 'application/pdf' ||
+        file.name.toLowerCase().endsWith('.pdf')
+      if (!looksPdf) {
         addNotification({ type: 'error', message: 'Lütfen bir PDF dosyası seçin.' })
         return
       }
@@ -43,8 +46,10 @@ export function usePDF() {
 
         addNotification({ type: 'success', message: `${file.name} başarıyla yüklendi (${totalPages} sayfa).` })
         setStatus('idle')
-      } catch {
-        addNotification({ type: 'error', message: 'PDF yüklenirken bir hata oluştu.' })
+      } catch (err) {
+        console.error('PDF load error:', err)
+        const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
+        addNotification({ type: 'error', message: `PDF yüklenirken hata oluştu: ${msg}` })
         setStatus('error')
       }
     },
