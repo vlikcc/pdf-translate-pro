@@ -185,6 +185,27 @@ class GeminiService {
     return this.model
   }
 
+  private getResponseText(result: any): string {
+    if (!result?.response) {
+      throw new Error('API yanıt döndürmedi.')
+    }
+    
+    const candidate = result.response.candidates?.[0]
+    if (!candidate) {
+      return result.response.text?.() || ''
+    }
+
+    if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'BLOCK') {
+      throw new Error('İçerik güvenlik veya politika filtresine takıldı.')
+    }
+
+    if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+      throw new Error('API geçerli bir metin üretemedi (boş içerik döndürdü). Görüntü desteklenmiyor olabilir veya çok karmaşık.')
+    }
+
+    return result.response.text()
+  }
+
   async translate(text: string): Promise<TranslateResponse> {
     const model = this.ensureModel()
     return this.enqueue(async () => {
@@ -192,7 +213,7 @@ class GeminiService {
         TRANSLATION_PROMPT,
         `\nÇevrilecek metin:\n${text}`,
       ])
-      const responseText = result.response.text()
+      const responseText = this.getResponseText(result)
       return this.parseJSON<TranslateResponse>(responseText)
     })
   }
@@ -210,7 +231,7 @@ class GeminiService {
           },
         },
       ])
-      const responseText = result.response.text()
+      const responseText = this.getResponseText(result)
       return this.parseJSON<TranslateResponse>(responseText)
     })
   }
@@ -227,7 +248,7 @@ class GeminiService {
           },
         },
       ])
-      const responseText = result.response.text()
+      const responseText = this.getResponseText(result)
       return this.parseJSON<LaTeXResponse>(responseText)
     })
   }
@@ -239,7 +260,7 @@ class GeminiService {
         LATEX_TEXT_PROMPT,
         `\nDönüştürülecek metin:\n${text}`,
       ])
-      const responseText = result.response.text()
+      const responseText = this.getResponseText(result)
       return this.parseJSON<LaTeXResponse>(responseText)
     })
   }
@@ -256,7 +277,7 @@ class GeminiService {
           },
         },
       ])
-      const responseText = result.response.text()
+      const responseText = this.getResponseText(result)
       return this.parseJSON<ContentTypeResponse>(responseText)
     })
   }
