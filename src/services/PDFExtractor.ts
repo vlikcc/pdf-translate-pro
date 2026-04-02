@@ -87,48 +87,53 @@ class PDFExtractor {
     rect?: { x: number; y: number; width: number; height: number },
     scale = 1.0,
   ): Promise<string> {
-    const page = await this.getPage(pageNumber)
-    const textContent = await page.getTextContent()
-    const viewport = page.getViewport({ scale })
+    try {
+      const page = await this.getPage(pageNumber)
+      const textContent = await page.getTextContent()
+      const viewport = page.getViewport({ scale })
 
-    const items: TextItem[] = textContent.items
-      .filter((item): item is typeof item & { str: string; transform: number[]; width: number; height: number } => 'str' in item && 'transform' in item)
-      .map((item) => {
-        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform)
-        return {
-          text: item.str,
-          x: tx[4],
-          y: tx[5],
-          width: item.width * scale,
-          height: item.height * scale,
-        }
+      const items: TextItem[] = textContent.items
+        .filter((item): item is typeof item & { str: string; transform: number[]; width: number; height: number } => 'str' in item && 'transform' in item)
+        .map((item) => {
+          const tx = pdfjsLib.Util.transform(viewport.transform, item.transform)
+          return {
+            text: item.str,
+            x: tx[4],
+            y: tx[5],
+            width: item.width * scale,
+            height: item.height * scale,
+          }
+        })
+
+      if (!rect) {
+        return items.map((i) => i.text).join(' ')
+      }
+
+      const filtered = items.filter((item) => {
+        const itemRight = item.x + item.width
+        const itemBottom = item.y + item.height
+        const rectRight = rect.x + rect.width
+        const rectBottom = rect.y + rect.height
+
+        return (
+          item.x < rectRight &&
+          itemRight > rect.x &&
+          item.y < rectBottom &&
+          itemBottom > rect.y
+        )
       })
 
-    if (!rect) {
-      return items.map((i) => i.text).join(' ')
+      filtered.sort((a, b) => {
+        const lineDiff = Math.abs(a.y - b.y)
+        if (lineDiff < 5) return a.x - b.x
+        return a.y - b.y
+      })
+
+      return filtered.map((i) => i.text).join(' ')
+    } catch (err) {
+      console.warn('Text content extraction failed during selection (Safari incompatibility), falling back to OCR:', err)
+      return ''
     }
-
-    const filtered = items.filter((item) => {
-      const itemRight = item.x + item.width
-      const itemBottom = item.y + item.height
-      const rectRight = rect.x + rect.width
-      const rectBottom = rect.y + rect.height
-
-      return (
-        item.x < rectRight &&
-        itemRight > rect.x &&
-        item.y < rectBottom &&
-        itemBottom > rect.y
-      )
-    })
-
-    filtered.sort((a, b) => {
-      const lineDiff = Math.abs(a.y - b.y)
-      if (lineDiff < 5) return a.x - b.x
-      return a.y - b.y
-    })
-
-    return filtered.map((i) => i.text).join(' ')
   }
 
   async captureRegion(
