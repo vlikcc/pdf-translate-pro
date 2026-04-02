@@ -1,0 +1,12 @@
+<IfModule mod_mime.c>
+  AddType text/javascript .js .mjs
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /pdftranslator/
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /pdftranslator/index.html [L]
+</IfModule>
